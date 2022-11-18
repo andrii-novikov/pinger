@@ -11,11 +11,10 @@ import (
 	"github.com/alexflint/go-arg"
 )
 
-const filename = ".okat"
+const filename = "/tmp/.pinger"
 
 var args struct {
 	Addr        string        `arg:"-a" default:"8.8.8.8"`
-	Timeout     int           `arg:"-t" default:"2"`
 	Token       string        `arg:"env:TELEGRAM_TOKEN,required"`
 	ChatId      string        `arg:"env:TELEGRAM_CHAT_ID,required"`
 	MinOffDelay time.Duration `arg:"-d" default:"60s"`
@@ -26,7 +25,7 @@ var okAt time.Time
 func main() {
 	arg.MustParse(&args)
 
-	command := fmt.Sprintf("ping -c 1 -t %d %s > /dev/null", args.Timeout, args.Addr)
+	command := fmt.Sprintf("ping -c 1 %s > /dev/null", args.Addr)
 	_, err := exec.Command("/bin/sh", "-c", command).Output()
 
 	if err != nil {
