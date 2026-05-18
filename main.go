@@ -34,6 +34,7 @@ func main() {
 	log.SetFlags(log.Ltime)
 	arg.MustParse(&args)
 
+	debugf("--- run %s ---", time.Now().Format(time.RFC3339))
 	debugf("pinging %s", args.Addr)
 
 	command := fmt.Sprintf("ping -c 1 %s > /dev/null", args.Addr)
