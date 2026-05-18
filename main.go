@@ -15,11 +15,11 @@ import (
 const filename = "/tmp/.pinger"
 
 var args struct {
-	Addr        string        `arg:"-a" default:"8.8.8.8"`
+	Addr        string        `arg:"-a,env:PING_ADDR" default:"8.8.8.8"`
 	Token       string        `arg:"env:TELEGRAM_TOKEN,required"`
 	ChatId      string        `arg:"env:TELEGRAM_CHAT_ID,required"`
-	MinOffDelay time.Duration `arg:"-d" default:"60s"`
-	Debug       bool          `arg:"-v" help:"enable debug logging"`
+	MinOffDelay time.Duration `arg:"-d,env:MIN_OFF_DELAY" default:"70s"`
+	Debug       bool          `arg:"-v,env:DEBUG"`
 }
 
 var okAt time.Time
@@ -53,7 +53,7 @@ func main() {
 	if time.Since(okAt) > args.MinOffDelay {
 		downtime := time.Since(okAt)
 		debugf("downtime %.0fs exceeds threshold %.0fs, sending telegram", downtime.Seconds(), args.MinOffDelay.Seconds())
-		sendTelegramMessage(fmt.Sprintf("Internet is back. Downtime: %1s", downtime))
+		sendTelegramMessage(fmt.Sprintf("Internet is back. Downtime: %s", downtime.Round(time.Second)))
 		log.Printf("telegram notification sent (downtime: %s)", downtime.Round(time.Second))
 	}
 
@@ -61,7 +61,6 @@ func main() {
 	debugf("saved ok at")
 }
 
-// loadOkAt reads last ok time from file
 func loadOkAt() time.Time {
 	dat, err := os.ReadFile(filename)
 	if err != nil {
@@ -70,7 +69,6 @@ func loadOkAt() time.Time {
 	}
 
 	t, err := time.Parse(time.RFC3339, string(dat))
-
 	if err != nil {
 		panic(err)
 	}
@@ -78,16 +76,12 @@ func loadOkAt() time.Time {
 	return t
 }
 
-// saveOkAt writes last ok time to file
 func saveOkAt(t time.Time) {
-	err := os.WriteFile(filename, []byte(t.Format(time.RFC3339)), 0644)
-
-	if err != nil {
+	if err := os.WriteFile(filename, []byte(t.Format(time.RFC3339)), 0644); err != nil {
 		panic(err)
 	}
 }
 
-// sendTelegramMessage sends message to telegram chat
 func sendTelegramMessage(message string) {
 	debugf("sending telegram message: %q", message)
 
@@ -97,7 +91,6 @@ func sendTelegramMessage(message string) {
 	}
 
 	resp, err := http.PostForm("https://api.telegram.org/bot"+args.Token+"/sendMessage", data)
-
 	if err != nil {
 		panic(err)
 	}

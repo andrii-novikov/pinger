@@ -12,4 +12,4 @@ deploy: build
 	scp bin/raspbery/pinger $(RASPBERRY_HOST):$(RASPBERRY_PATH)/pinger
 
 enable-cron:
-	ssh $(RASPBERRY_HOST) '(crontab -l 2>/dev/null | grep -v "$(RASPBERRY_PATH)/pinger"; echo "$(CRON_SCHEDULE) TELEGRAM_TOKEN=$(TELEGRAM_TOKEN) TELEGRAM_CHAT_ID=$(TELEGRAM_CHAT_ID) $(RASPBERRY_PATH)/pinger -v >> $(PINGER_LOG) 2>&1") | crontab -'
+	ssh $(RASPBERRY_HOST) '(crontab -l 2>/dev/null | grep -v "$(RASPBERRY_PATH)/pinger"; echo "$(CRON_SCHEDULE) TELEGRAM_TOKEN=$(TELEGRAM_TOKEN) TELEGRAM_CHAT_ID=$(TELEGRAM_CHAT_ID) PING_ADDR=$(PING_ADDR) MIN_OFF_DELAY=$(MIN_OFF_DELAY) DEBUG=$(DEBUG) $(RASPBERRY_PATH)/pinger >> $(PINGER_LOG) 2>&1") | crontab -'
