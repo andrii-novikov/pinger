@@ -1,0 +1,22 @@
+name: Manual Test Verification Gate
+
+on:
+  # Allows you to manually trigger this workflow from the GitHub Actions tab or PR
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'The Pull Request number being tested (for tracking)'
+        required: true
+        type: string
+
+jobs:
+  manual-verification-gate:
+    runs-on: ubuntu-latest
+    # This links the job to your environment that requires human approval
+    environment: manual-testing
+
+    steps:
+      - name: Log Verification
+        run: |
+          echo "Manual testing initiated for PR #${{ github.event.inputs.pr_number }}"
+          echo "Verification approved by environment reviewer!"
