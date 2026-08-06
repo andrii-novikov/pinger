@@ -1,4 +1,4 @@
-# pinger
+# pinger1
 
 Monitors internet connectivity on a Raspberry Pi and sends a Telegram notification when the connection is restored after an outage.
 
