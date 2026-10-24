@@ -14,7 +14,9 @@ import (
 	"github.com/alexflint/go-arg"
 )
 
-const filename = "/tmp/.pinger"
+var filename = "/tmp/.pinger"
+
+var httpClient = &http.Client{Timeout: 30 * time.Second}
 
 // interval accepts a Go duration ("1m", "60s") or plain seconds ("60").
 type interval time.Duration
@@ -86,10 +88,7 @@ func check() error {
 
 	debugf("ping ok")
 
-	okAt, err := loadOkAt()
-	if err != nil {
-		return err
-	}
+	okAt := loadOkAt()
 	debugf("last ok at: %s (%.0fs ago)", okAt.Format(time.RFC3339), time.Since(okAt).Seconds())
 
 	if time.Since(okAt) > args.MinOffDelay {
@@ -108,19 +107,21 @@ func check() error {
 	return nil
 }
 
-func loadOkAt() (time.Time, error) {
+func loadOkAt() time.Time {
 	dat, err := os.ReadFile(filename)
 	if err != nil {
 		debugf("state file not found, using current time")
-		return time.Now(), nil
+		return time.Now()
 	}
 
 	t, err := time.Parse(time.RFC3339, string(dat))
 	if err != nil {
-		return time.Time{}, fmt.Errorf("parse %s: %w", filename, err)
+		// A power cut mid-write can leave the file empty or truncated. Start over instead of failing every check.
+		log.Printf("ignoring unreadable %s: %v", filename, err)
+		return time.Now()
 	}
 
-	return t, nil
+	return t
 }
 
 func saveOkAt(t time.Time) error {
@@ -138,8 +139,13 @@ func sendTelegramMessage(message string) error {
 		"text":    {message},
 	}
 
-	resp, err := http.PostForm("https://api.telegram.org/bot"+args.Token+"/sendMessage", data)
+	resp, err := httpClient.PostForm("https://api.telegram.org/bot"+args.Token+"/sendMessage", data)
 	if err != nil {
+		// A *url.Error carries the request URL, which holds the bot token: keep only the cause
+		var uerr *url.Error
+		if errors.As(err, &uerr) {
+			err = uerr.Err
+		}
 		return fmt.Errorf("telegram: %w", err)
 	}
 	defer resp.Body.Close()
