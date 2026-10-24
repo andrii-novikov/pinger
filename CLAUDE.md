@@ -17,10 +17,10 @@ TELEGRAM_TOKEN=x TELEGRAM_CHAT_ID=y go run . -v
 
 ## Architecture
 
-Single-file Go program (`main.go`) designed to run every minute via cron on a Raspberry Pi. It pings an IP address and sends a Telegram message when internet connectivity is restored after a sustained outage.
+Single-file Go program (`main.go`) that runs either once per invocation (cron) or, with `PINGER_INTERVAL`, as a long-running loop (the container image in `Dockerfile`, deployed to the Pi through the homelab repo). It pings an IP address and sends a Telegram message when internet connectivity is restored after a sustained outage.
 
 **Flow:**
-1. Ping `PING_ADDR` — exit 1 on failure (cron will log it, no notification)
+1. Ping `PING_ADDR` — on failure: exit 1 in cron mode, wait for the next check in interval mode (no notification)
 2. Load last-ok timestamp from `/tmp/.pinger`
 3. If `time.Since(lastOk) > MIN_OFF_DELAY` → send Telegram "Internet is back" message
 4. Save current time to `/tmp/.pinger`
@@ -37,6 +37,7 @@ All config is via environment variables (set in `.env`, loaded by the Makefile):
 | `TELEGRAM_CHAT_ID` | required | Telegram chat ID |
 | `PING_ADDR` | `8.8.8.8` | Address to ping |
 | `MIN_OFF_DELAY` | `70s` | Min downtime before notification |
+| `PINGER_INTERVAL` | unset | Loop and check every interval (`60s` or `60`); unset = one check |
 | `DEBUG` | `false` | Enable verbose logging |
 | `RASPBERRY_HOST` | — | SSH target, e.g. `pi@raspberrypi.local` |
 | `CRON_SCHEDULE` | `* * * * *` | Cron expression |

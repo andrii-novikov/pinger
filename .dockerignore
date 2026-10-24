@@ -1,0 +1,7 @@
+.git/
+.github/
+bin/
+.env
+*.md
+Makefile
+*_test.go

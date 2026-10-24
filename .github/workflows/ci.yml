@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test ./...
+
+      - name: Build image
+        run: docker build -t pinger:ci .
+
+  # Deploys go through the homelab repo, whose workflow runs on the Pi's self-hosted runner: it checks out
+  # this commit, builds pinger:latest on the Pi and recreates the stack's pinger service.
+  deploy:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
+    steps:
+      - name: Deploy to Pi via homelab
+        env:
+          GH_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+          HOMELAB_REPO: andrii-novikov/homelab
+        run: |
+          if [ -z "$GH_TOKEN" ]; then echo "::warning::DEPLOY_TOKEN is not set; skipping the deploy"; exit 0; fi
+          since="$(date -u -d '-30 seconds' +%Y-%m-%dT%H:%M:%SZ)"
+          gh workflow run deploy-pi.yml -R "$HOMELAB_REPO" -f service=pinger -f ref="$GITHUB_SHA"
+          run_id=""
+          for _ in $(seq 1 24); do
+            sleep 5
+            run_id="$(gh run list -R "$HOMELAB_REPO" --workflow deploy-pi.yml --event workflow_dispatch -L 10 \
+              --json databaseId,createdAt --jq "map(select(.createdAt >= \"$since\")) | last | .databaseId // empty")"
+            [ -n "$run_id" ] && break
+          done
+          if [ -z "$run_id" ]; then echo "::error::dispatched deploy run not found"; exit 1; fi
+          echo "Deploy run: https://github.com/$HOMELAB_REPO/actions/runs/$run_id"
+          gh run watch "$run_id" -R "$HOMELAB_REPO" --interval 15 --exit-status
