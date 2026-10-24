@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -43,15 +46,9 @@ jobs:
           HOMELAB_REPO: andrii-novikov/homelab
         run: |
           if [ -z "$GH_TOKEN" ]; then echo "::warning::DEPLOY_TOKEN is not set; skipping the deploy"; exit 0; fi
-          since="$(date -u -d '-30 seconds' +%Y-%m-%dT%H:%M:%SZ)"
-          gh workflow run deploy-pi.yml -R "$HOMELAB_REPO" -f service=pinger -f ref="$GITHUB_SHA"
-          run_id=""
-          for _ in $(seq 1 24); do
-            sleep 5
-            run_id="$(gh run list -R "$HOMELAB_REPO" --workflow deploy-pi.yml --event workflow_dispatch -L 10 \
-              --json databaseId,createdAt --jq "map(select(.createdAt >= \"$since\")) | last | .databaseId // empty")"
-            [ -n "$run_id" ] && break
-          done
-          if [ -z "$run_id" ]; then echo "::error::dispatched deploy run not found"; exit 1; fi
+          out="$(gh workflow run deploy-pi.yml -R "$HOMELAB_REPO" -f service=pinger -f ref="$GITHUB_SHA")"
+          # gh prints the URL of the run it created, so this watches our run even when another repo deploys at the same time
+          run_id="$(grep -oE '/actions/runs/[0-9]+' <<<"$out" | tail -1 | cut -d/ -f4)"
+          if [ -z "$run_id" ]; then echo "::error::gh did not return the deploy run: $out"; exit 1; fi
           echo "Deploy run: https://github.com/$HOMELAB_REPO/actions/runs/$run_id"
           gh run watch "$run_id" -R "$HOMELAB_REPO" --interval 15 --exit-status
